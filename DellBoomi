@@ -1,0 +1,79 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+name: $(Rev:r)
+trigger:
+- master
+
+pool:
+  vmImage: 'macOS-latest'
+
+stages:
+  - stage: createPackage
+    jobs:
+      - job: Packaging
+        steps: 
+         - task: Bash@3
+           inputs:
+            targetType: 'inline'
+            script: |
+
+             export accountId=trainingmayankbansal-HFRWKS
+             export authToken=mayankbansal15@rocketmail.com:5Vnzur_276332
+             export h1="Content-Type: application/json"
+             export h2="Accept: application/json"
+             export baseURL=https://api.boomi.com/api/rest/v1/$accountId
+             pwd
+             cd DellBoomi
+             export WORKSPACE=`pwd`
+             sh  bin/createPackagedComponent.sh componentId=b17e4fc8-0c06-483e-8ed2-5df21cd3c049 processName="NewProcess" componentType="process" componentVersion="2" packageVersion="313" notes="sshhsha"
+             pwd
+             ls -ltrh
+
+         - task: CopyFiles@2
+           inputs:
+             SourceFolder: 'DellBoomi'
+             Contents: 'out.json'
+             TargetFolder: '$(build.artifactstagingdirectory)'
+         - task: PublishBuildArtifacts@1
+           inputs:
+             PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+             ArtifactName: 'DellBoomi'
+             publishLocation: 'Container'
+
+  - stage:  Deploy
+    jobs:
+      - deployment: DevDeploy
+        environment: dellboomidev
+        strategy:
+         runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                      buildType: 'current'
+                      downloadType: 'single'
+                      artifactName: 'DellBoomi'
+                      downloadPath: '$(Pipeline.Workspace)'
+
+                - task: Bash@3
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      export accountId=trainingmayankbansal-HFRWKS
+                      export authToken=mayankbansal15@rocketmail.com:5Vnzur_276332
+                      export h1="Content-Type: application/json"
+                      export h2="Accept: application/json"
+                      export baseURL=https://api.boomi.com/api/rest/v1/$accountId
+                      export pkid=`jq -a .packageId $(Pipeline.Workspace)/DellBoomi/out.json`
+                      echo $pkid
+                      
+                      git clone https://Mayankbansal1508:vmi5rboulk36o22q7bamoogqdibol5g2expv74xszn6anruto4na@dev.azure.com/Mayankbansal1508/Mayankbansal1508/_git/Mayankbansal1508
+                      ls -ltrh
+                      cd Mayankbansal1508/DellBoomi
+                      export WORKSPACE=`pwd`
+                      sh bin/createDeployedPackage.sh envId="f7405a21-cbd1-4bff-ab5c-75c130c6c24b" packageId=$pkid notes=abcd listenerStatus="PAUSED"
+                      
+         
+
