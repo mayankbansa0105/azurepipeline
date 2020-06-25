@@ -1,0 +1,138 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+variables:
+- group: oic_credential
+
+parameters:
+  - name: ApplicationName
+    displayName: AppName
+    type: string
+    values:
+    - Helloworld
+    - RunReport
+    - Testing
+
+  - name: Deploychoice
+    type: string
+    values:
+    - Deploy
+    - redeploy
+trigger:
+- master
+
+
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+   - stage: Deployfile
+
+     jobs:
+       - job: Deploy
+         steps:
+         - task: Bash@3
+           inputs:
+             targetType: 'inline'
+             script: |
+               cd OIC/${{ parameters.ApplicationName }}
+                            if [[ ${{ parameters.Deploychoice }} == Deploy ]]
+                             then
+                             for i in `ls -ltrh *iar | awk '{ print $9}'`
+                            do
+                                  status=$(curl  -u $(username):$(password) -H "Accept: application/json" -X POST -F \
+                                  "file=@"$i";type=application/octet-stream" \
+                                  https://oic-idrzhlcnmui9-ia.integration.ocp.oraclecloud.com/icsapis/v2/integrations/archive \
+                                  -w %{http_code} -o response.out)
+                                  if [ $status -eq  200 ]
+                                  then
+                                  echo " Deployment of Application is successful"
+                                  else
+                                  cat response.out
+                                  rm response.out
+                                  exit -1
+                                  fi
+                           done
+                          else
+                             for i in `ls -ltrh *iar | awk '{ print $9}'`
+                              do
+                               n=15
+                               l=`echo -n $i|wc -m`
+                               c=`expr $l - $n`
+                               d=`expr $c + 1`
+                               e=`expr $l - 5`
+                               id=`echo ${i:0:$c}`
+                               ver=`echo ${i:$d:10}`
+                               echo $id
+                                echo $ver
+                                act_status=$(curl  -X POST -u $(username):$(password) -H "Content-Type:application/json" \
+                                -H "X-HTTP-Method-Override:PATCH" -d '{"status":"CONFIGURED"}' \
+                                 https://oic-idrzhlcnmui9-ia.integration.ocp.oraclecloud.com/icsapis/v2/integrations/"$id"%7C$ver \
+                                 -w %{http_code} -o response.out)
+               
+                                 if [ $act_status -eq  200 ]
+                                  then
+                                  echo " Deactivation of $i is successful"
+                                  elif [ $act_status -eq  412 ]
+                                   then
+                                    echo " Deactivation of $i was already done"
+                                    else 
+                                  cat response.out
+                                    rm response.out
+                                    exit -1
+                                     fi
+                                    
+                               done
+                                for i in `ls -ltrh *iar | awk '{ print $9}'`
+                                  do
+                                 status=$(curl  -u $(username):$(password) -H "Accept: application/json" -X PUT -F "file=@"$i";type=application/octet-stream" https://oic-idrzhlcnmui9-ia.integration.ocp.oraclecloud.com/icsapis/v2/integrations/archive  -w %{http_code} -o response.out)
+                                  if [ $status -eq  200 ]
+                                  then
+                                  echo " Deployment of Application is successful"
+                                  else
+                                  cat response.out
+                                  rm response.out
+                                  exit -1
+                                  fi
+                                  done
+                                 fi
+
+             
+
+   - stage: Activate
+     jobs:
+       - job: ActivateIntegration
+         steps:
+         - task: Bash@3
+           inputs:
+             targetType: 'inline'
+             script: |
+                   cd OIC/${{ parameters.ApplicationName }}
+                     for i in `ls -ltrh *iar | awk '{ print $9}'`
+                    do
+                     n=15
+                      l=`echo -n $i|wc -m`
+                     c=`expr $l - $n`
+                     d=`expr $c + 1`
+                     e=`expr $l - 5`
+                      id=`echo ${i:0:$c}`
+                     ver=`echo ${i:$d:10}`
+                     echo $id
+                     echo $ver
+                      act_status=$(curl  -X POST -u $(username):$(password) -H "Content-Type:application/json" \
+                      -H "X-HTTP-Method-Override:PATCH" -d '{"status":"ACTIVATED"}' \
+                      https://oic-idrzhlcnmui9-ia.integration.ocp.oraclecloud.com/icsapis/v2/integrations/"$id"%7C$ver \
+                      -w %{http_code} -o response.out)
+
+                      if [ $act_status -eq  200 ]
+                           then
+                        echo " Activation of $i is successful"
+ 
+                        else 
+                       cat response.out
+                       rm response.out
+                       exit -1
+                      fi
+                     done
