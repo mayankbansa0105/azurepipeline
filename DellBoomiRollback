@@ -1,0 +1,114 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+name: $(TeamProject)_$(Build.DefinitionName)_$(SourceBranchName)_$(Date:yyyyMMdd)$(Rev:.r)
+trigger: none
+parameters:
+  - name: PackageVersion
+    type: string
+  - name: Interfacename
+    type: string
+    values:
+      - NewProcess
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: QueryPackage
+    jobs:
+      - job: Packaging
+        steps:
+          - task: Bash@3
+            inputs:
+             targetType: 'inline'
+             script: |
+              cd DellBoomi
+              app=${{ parameters.Interfacename }}
+              pckversion=${{ parameters.PackageVersion }}
+              sed -i "s/value/${app}/g" queryprocess.json
+              curl -s -X POST -u mayankbansal15@rocketmail.com:5Vnzur_276332 -H "Content-Type: application/json" -H "Accept: application/json" https://api.boomi.com/api/rest/v1/trainingmayankbansal-HFRWKS/Process/query -d @queryprocess.json > componentId.json
+              componetId=`jq -r .result[].id componentId.json`
+              echo $componetId
+              sed -i "s/cpId/${componetId}/g" querypackagecompartment.json
+              sed -i "s/pkVersion/${pckversion}/g" querypackagecompartment.json
+              curl -s -X POST -u mayankbansal15@rocketmail.com:5Vnzur_276332 -H "Content-Type: application/json" -H "Accept: application/json" https://api.boomi.com/api/rest/v1/trainingmayankbansal-HFRWKS/PackagedComponent/query -d @querypackagecompartment.json > out.json
+               cat out.json
+
+          - task: CopyFiles@2
+            inputs:
+              SourceFolder: 'DellBoomi'
+              Contents: 'out.json'
+              TargetFolder: '$(build.artifactstagingdirectory)'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+             PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+             ArtifactName: 'DellBoomi'
+             publishLocation: 'Container'
+  - stage:  Deploy
+    jobs:
+      - deployment: DevDeploy
+        environment: dellboomidev
+        strategy:
+         runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                      buildType: 'current'
+                      downloadType: 'single'
+                      artifactName: 'DellBoomi'
+                      downloadPath: '$(Pipeline.Workspace)'
+
+                - task: Bash@3
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      export accountId=trainingmayankbansal-HFRWKS
+                      export authToken=mayankbansal15@rocketmail.com:5Vnzur_276332
+                      export h1="Content-Type: application/json"
+                      export h2="Accept: application/json"
+                      export baseURL=https://api.boomi.com/api/rest/v1/$accountId
+                      export pkid=`jq -r '.result[].packageId' $(Pipeline.Workspace)/DellBoomi/out.json`
+                      echo $pkid
+                      echo  {'"packageId"' : '"value"',  '"environmentId"' : '"f7405a21-cbd1-4bff-ab5c-75c130c6c24b"',  '"notes"' : '"new deployment"',  '"listenerStatus"' : '"PAUSED"'} > package.json
+                      jq --arg a $pkid '.packageId = $a' package.json > temp.json 
+                      cat temp.json
+                      
+                      curl -s -X POST -u $authToken -H "Content-Type: application/json"  -H "Accept: application/json" $baseURL/DeployedPackage -d @temp.json
+                      
+  - stage:  TestDeploy
+    jobs:
+      - deployment: TestDeploy
+        environment: dellboomitest
+        strategy:
+         runOnce:
+            deploy:
+              steps:
+               - task: DownloadBuildArtifacts@0
+                 inputs:
+                  buildType: 'current'
+                  downloadType: 'single'
+                  artifactName: 'DellBoomi'
+                  
+                  downloadPath: '$(Pipeline.Workspace)'
+                
+               - task: Bash@3
+                 inputs:
+                    targetType: 'inline'
+                    script: |
+                      export accountId=trainingmayankbansal-HFRWKS
+                      export authToken=mayankbansal15@rocketmail.com:5Vnzur_276332
+                      export h1="Content-Type: application/json"
+                      export h2="Accept: application/json"
+                      export baseURL=https://api.boomi.com/api/rest/v1/$accountId
+                      export pkid=`jq -r '.result[].packageId' $(Pipeline.Workspace)/DellBoomi/out.json`
+                      echo $pkid
+                      echo  {'"packageId"' : '"value"',  '"environmentId"' : '"57ed50db-6fa8-4974-8d35-f7c17dca42f0"',  '"notes"' : '"new deployment"',  '"listenerStatus"' : '"PAUSED"'} > package.json
+                      jq --arg a $pkid '.packageId = $a' package.json > temp.json 
+                      cat temp.json
+                      
+                      curl -s -X POST -u $authToken -H "Content-Type: application/json"  -H "Accept: application/json" $baseURL/DeployedPackage -d @temp.json
+                      
