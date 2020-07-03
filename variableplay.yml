@@ -1,0 +1,53 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+ none
+
+parameters:
+  - name: value
+    type: string
+  - name: value2
+    type: string
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+ - stage: Firststage
+   jobs:
+     - job: Job1
+       steps:
+         - script: |
+              ###Here I am defining a variable to be called within same job but in different tasks
+              envname=${{ parameters.value }}
+              echo "##vso[task.setvariable variable=envname]$envname"
+              echo $envname
+              
+         - bash: |
+              ###Here I am calling variable within Job  from one task to another task
+                echo $(envname)
+         - bash: |
+               ##Here i will create a variable which will be called in second job
+               varbwjobs=${{ parameters.value2  }}
+               echo "##vso[task.setvariable variable=varbwjobs;isOutput=true]$varbwjobs"
+           name: FirstJobfirstStep
+         - script: |
+              echo "$(FirstJobfirstStep.varbwjobs)"
+        
+     - job: Job2
+       dependsOn: Job1
+       variables: 
+          varbwjobs: $[ dependencies.Job1.outputs['FirstJobfirstStep.varbwjobs'] ]
+       steps:
+         -  script: echo $(varbwjobs)
+  
+ - stage: SecondStage
+   jobs:
+     - job: SecondstagefirstJob
+       variables:
+         varbwjobs: $[ stagedependencies.Firststage.Job1.outputs['FirstJobfirstStep.varbwjobs'] ]
+       steps:
+         - script: echo $(varbwjobs)
+
