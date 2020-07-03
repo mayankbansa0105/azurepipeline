@@ -1,0 +1,49 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+ none
+parameters:
+  - name: Env
+    type: string
+    values:
+      - Test
+      - Mayank
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: QueryEnvironment
+    jobs:
+      - job: Environment
+        steps:
+         - task: Bash@3
+           inputs:
+             targetType: 'inline'
+             script: |
+               cd DellBoomi
+               cat queryEnv.json
+               env=${{ parameters.Env }}
+               echo $env
+               sed -i "s/env/${env}/g" queryEnv.json
+               cat queryEnv.json
+               curl -s -X POST -u mayankbansal15@rocketmail.com:5Vnzur_276332 -H "Content-Type: application/json" -H "Accept: application/json" https://api.boomi.com/api/rest/v1/trainingmayankbansal-HFRWKS/Environment/query -d @queryEnv.json > env.json
+               EnvId=`jq -r .result[0].id env.json`
+               filename="Ext_$env.json"
+               echo $filename
+               curl -s -X POST -u mayankbansal15@rocketmail.com:5Vnzur_276332 -H "Content-Type: application/json" -H "Accept: application/json" https://api.boomi.com/api/rest/v1/trainingmayankbansal-HFRWKS/EnvironmentExtensions/$EnvId/update  -d @$filename
+
+          
+
+                
+              
+        
+          
+          
+     
+       
+
+
+
