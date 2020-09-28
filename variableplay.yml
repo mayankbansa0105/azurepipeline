@@ -12,7 +12,8 @@ parameters:
   - name: value2
     type: string
 pool:
-  vmImage: 'ubuntu-latest'
+   vmImage: 'ubuntu-latest'
+###  name: 'default'
 
 stages:
  - stage: Firststage
